@@ -1,0 +1,17 @@
+[package]
+name = "cider-mpris"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+openssl-sys = { version = "0.9", features = ["vendored"] }
+
+reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+futures = "0.3"
+zbus = { version = "4", default-features = false, features = ["tokio"] }
+dotenvy = "0.15"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }

@@ -1,0 +1,3 @@
+[D-BUS Service]
+Name=org.mpris.MediaPlayer2.cider
+Exec=/home/xian/repos/cider-mpris/target/release/cider-mpris
