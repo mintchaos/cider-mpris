@@ -7,6 +7,8 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 mod cider;
 mod mpris;
 
+const MPRIS_NAME: &str = "org.mpris.MediaPlayer2.cider-mpris";
+
 use crate::cider::CiderClient;
 use crate::mpris::root::Root;
 use crate::mpris::player::{Player, PlayerState, PlaybackStatus};
@@ -110,7 +112,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         // Release D-Bus name so widgets hide the player
                         if name_owned {
                             let _ = conn_for_signals
-                                .release_name("org.mpris.MediaPlayer2.cider")
+                                .release_name(MPRIS_NAME)
                                 .await;
                             name_owned = false;
                         }
@@ -142,7 +144,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     // Register D-Bus name now that something is playing
                     if !name_owned {
                         if let Err(e) = conn_for_signals
-                            .request_name("org.mpris.MediaPlayer2.cider")
+                            .request_name(MPRIS_NAME)
                             .await
                         {
                             tracing::warn!("Failed to request D-Bus name: {:?}", e);
@@ -235,7 +237,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     // Cider reports nothing playing — release D-Bus name so widget hides
                     if name_owned {
                         let _ = conn_for_signals
-                            .release_name("org.mpris.MediaPlayer2.cider")
+                            .release_name(MPRIS_NAME)
                             .await;
                         name_owned = false;
                     }
@@ -278,7 +280,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    tracing::info!("cider-mpris bridge running on D-Bus as org.mpris.MediaPlayer2.cider");
+    tracing::info!("cider-mpris bridge running on D-Bus as {MPRIS_NAME}");
     tracing::info!("Press Ctrl+C to stop.");
     
     // Keep alive
