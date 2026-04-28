@@ -32,16 +32,22 @@ In your home-manager config:
 ```nix
 { inputs, ... }: {
   imports = [ inputs.cider-mpris.homeModules.cider-mpris ];
-  services.cider-mpris = {
-    enable = true;
-    rpcTokenFile = /path/to/file/containing/token;
-  };
+  services.cider-mpris.enable = true;
 }
 ```
 
 This installs the binary, creates the systemd user service, and auto-starts the bridge.
 
-The token file should contain just the raw token — no quotes, no newlines:
+**Important:** The service reads `CIDER_RPC_TOKEN` from `~/.config/cider-mpris/env`.
+The module creates a placeholder file — you must edit it with your token (find it in
+Cider: Settings → RPC Token), or the service will fail to start:
+
+```
+CIDER_RPC_TOKEN=wJHV1...your_token_here...abc123
+```
+
+Alternatively, provide the env var through another mechanism like systemd's
+`Environment=` or a shell profile.
 
 ### Non-Nix (untested)
 

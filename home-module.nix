@@ -9,21 +9,19 @@ in {
       type = lib.types.package;
       description = "The cider-mpris package to use (set by the flake)";
     };
-
-    rpcTokenFile = lib.mkOption {
-      type = lib.types.nullOr lib.types.path;
-      default = null;
-      description = "Path to file containing CIDER_RPC_TOKEN";
-    };
   };
 
   config = lib.mkIf cfg.enable {
     home.packages = [ cfg.package ];
 
-    xdg.configFile."cider-mpris/env".text =
-      if cfg.rpcTokenFile != null
-      then "CIDER_RPC_TOKEN=${builtins.readFile cfg.rpcTokenFile}"
-      else "# Add your CIDER_RPC_TOKEN here\nCIDER_RPC_TOKEN=";
+    # The env file is created as a placeholder. You must edit it with your
+    # Cider RPC token, or set CIDER_RPC_TOKEN in your environment another way.
+    # Without the token, the service will fail to start.
+    xdg.configFile."cider-mpris/env".text = ''
+      # Add your CIDER_RPC_TOKEN here.
+      # Find it in Cider: Settings → RPC Token
+      CIDER_RPC_TOKEN=
+    '';
 
     systemd.user.services.cider-mpris = {
       Unit = {
