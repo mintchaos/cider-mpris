@@ -15,13 +15,11 @@
           version = "0.1.0";
           src = self;
           cargoLock.lockFile = ./Cargo.lock;
-          nativeBuildInputs = [ pkgs.pkg-config ];
-          buildInputs = [ pkgs.openssl ];
         };
 
         devShells.default = pkgs.mkShell {
           inputsFrom = [ self.packages.${system}.default ];
-          packages = with pkgs; [ cargo rustc rust-analyzer pkg-config openssl ];
+          packages = with pkgs; [ cargo rustc rust-analyzer ];
         };
       }
     ) // {
