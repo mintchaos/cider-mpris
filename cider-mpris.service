@@ -1,0 +1,14 @@
+[Unit]
+Description=Cider MPRIS Bridge
+After=graphical-session.target
+Wants=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/cider-mpris
+EnvironmentFile=%h/.config/cider-mpris/env
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
