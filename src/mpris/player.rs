@@ -97,12 +97,28 @@ impl Player {
         }
     }
 
-    fn seek(&self, offset: i64) {
-        tracing::info!("Seek requested: {} us (not supported by Cider API)", offset);
+    async fn seek(&self, offset: i64) {
+        let current_pos = {
+            let state = self.state.read().unwrap();
+            if state.playback_status == PlaybackStatus::Playing {
+                let elapsed = state.position_snapshot_at.elapsed().as_micros() as i64;
+                state.position_snapshot_us.saturating_add(elapsed)
+            } else {
+                state.position_snapshot_us
+            }
+        };
+        let target_us = (current_pos + offset).max(0);
+        let target_seconds = target_us as f64 / 1_000_000.0;
+        if let Err(e) = self.client.seek(target_seconds).await {
+            tracing::warn!("Seek failed: {:?}", e);
+        }
     }
 
-    fn set_position(&self, track_id: ObjectPath<'_>, position: i64) {
-        tracing::info!("SetPosition: {} at {} us (not supported by Cider API)", track_id, position);
+    async fn set_position(&self, _track_id: ObjectPath<'_>, position: i64) {
+        let target_seconds = (position.max(0)) as f64 / 1_000_000.0;
+        if let Err(e) = self.client.seek(target_seconds).await {
+            tracing::warn!("SetPosition failed: {:?}", e);
+        }
     }
 
     fn open_uri(&self, uri: &str) {
@@ -197,7 +213,7 @@ impl Player {
 
     #[zbus(property)]
     fn can_seek(&self) -> bool {
-        false
+        true
     }
 
     #[zbus(property)]

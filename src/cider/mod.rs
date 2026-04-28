@@ -131,6 +131,17 @@ impl CiderClient {
         self.client.post(&url).headers(self.headers()).send().await?;
         Ok(())
     }
+
+    pub async fn seek(&self, position_seconds: f64) -> Result<(), ClientError> {
+        let url = format!("{}/api/v1/playback/seek", self.base_url);
+        self.client
+            .post(&url)
+            .headers(self.headers())
+            .json(&types::SeekRequest { position: position_seconds })
+            .send()
+            .await?;
+        Ok(())
+    }
 }
 
 #[derive(Debug)]

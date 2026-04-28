@@ -40,3 +40,8 @@ pub struct ShuffleModeResponse {
     #[serde(rename = "shuffleMode")]
     pub shuffle_mode: u8,
 }
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct SeekRequest {
+    pub position: f64,
+}
