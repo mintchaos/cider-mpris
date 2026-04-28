@@ -99,6 +99,38 @@ impl CiderClient {
         self.client.post(&url).headers(self.headers()).send().await?;
         Ok(())
     }
+
+    pub async fn get_repeat_mode(&self) -> Result<u8, ClientError> {
+        let url = format!("{}/api/v1/playback/repeat-mode", self.base_url);
+        let resp = self.client
+            .get(&url)
+            .headers(self.headers())
+            .send()
+            .await?;
+        Ok(resp.json::<RepeatModeResponse>().await?.repeat_mode)
+    }
+
+    pub async fn get_shuffle_mode(&self) -> Result<u8, ClientError> {
+        let url = format!("{}/api/v1/playback/shuffle-mode", self.base_url);
+        let resp = self.client
+            .get(&url)
+            .headers(self.headers())
+            .send()
+            .await?;
+        Ok(resp.json::<ShuffleModeResponse>().await?.shuffle_mode)
+    }
+
+    pub async fn toggle_repeat(&self) -> Result<(), ClientError> {
+        let url = format!("{}/api/v1/playback/toggle-repeat", self.base_url);
+        self.client.post(&url).headers(self.headers()).send().await?;
+        Ok(())
+    }
+
+    pub async fn toggle_shuffle(&self) -> Result<(), ClientError> {
+        let url = format!("{}/api/v1/playback/toggle-shuffle", self.base_url);
+        self.client.post(&url).headers(self.headers()).send().await?;
+        Ok(())
+    }
 }
 
 #[derive(Debug)]

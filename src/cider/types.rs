@@ -28,3 +28,15 @@ pub struct Artwork {
 pub struct PlaybackStatusResponse {
     pub is_playing: bool,
 }
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct RepeatModeResponse {
+    #[serde(rename = "repeatMode")]
+    pub repeat_mode: u8,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ShuffleModeResponse {
+    #[serde(rename = "shuffleMode")]
+    pub shuffle_mode: u8,
+}

@@ -28,6 +28,8 @@ pub struct PlayerState {
     pub now_playing: Option<NowPlayingInfo>,
     pub position_snapshot_us: i64,
     pub position_snapshot_at: Instant,
+    pub repeat_mode: u8,
+    pub shuffle_mode: u8,
 }
 
 impl Default for PlayerState {
@@ -37,6 +39,8 @@ impl Default for PlayerState {
             now_playing: None,
             position_snapshot_us: 0,
             position_snapshot_at: Instant::now(),
+            repeat_mode: 0,
+            shuffle_mode: 0,
         }
     }
 }
@@ -112,9 +116,20 @@ impl Player {
             .unwrap_or_else(|_| "Stopped".to_string())
     }
 
-    #[zbus(property)]
+    #[zbus(property(emits_changed_signal = "true"))]
     fn loop_status(&self) -> String {
-        "None".to_string()
+        match self.state.read().unwrap().repeat_mode {
+            1 => "Track".to_string(),
+            2 => "Playlist".to_string(),
+            _ => "None".to_string(),
+        }
+    }
+
+    #[zbus(property)]
+    async fn set_loop_status(&self, _value: &str) {
+        if let Err(e) = self.client.toggle_repeat().await {
+            tracing::warn!("Toggle repeat failed: {:?}", e);
+        }
     }
 
     #[zbus(property)]
@@ -122,9 +137,16 @@ impl Player {
         1.0
     }
 
-    #[zbus(property)]
+    #[zbus(property(emits_changed_signal = "true"))]
     fn shuffle(&self) -> bool {
-        false
+        self.state.read().unwrap().shuffle_mode != 0
+    }
+
+    #[zbus(property)]
+    async fn set_shuffle(&self, _value: bool) {
+        if let Err(e) = self.client.toggle_shuffle().await {
+            tracing::warn!("Toggle shuffle failed: {:?}", e);
+        }
     }
 
     #[zbus(property)]

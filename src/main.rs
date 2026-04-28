@@ -63,6 +63,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut cider_available = true;
         let mut prev_status: Option<PlaybackStatus> = None;
         let mut prev_metadata_key: Option<String> = None;
+        let mut prev_repeat_mode: Option<u8> = None;
+        let mut prev_shuffle_mode: Option<u8> = None;
         
         loop {
             // --- Check playback status from Cider ---
@@ -110,6 +112,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             .await;
                         prev_status = Some(PlaybackStatus::Stopped);
                         prev_metadata_key = None;
+                        prev_repeat_mode = None;
+                        prev_shuffle_mode = None;
                     }
                     tokio::time::sleep(retry_interval).await;
                     continue;
@@ -139,6 +143,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // --- Fetch now-playing metadata ---
             match client_for_poll.now_playing().await {
                 Ok(Some(info)) => {
+                    // Fetch repeat and shuffle modes before acquiring the write lock
+                    let repeat_mode = client_for_poll.get_repeat_mode().await.unwrap_or(0);
+                    let shuffle_mode = client_for_poll.get_shuffle_mode().await.unwrap_or(0);
+                    
                     let (meta_key, metadata_changed, status_changed, metadata_for_signal) = {
                         let mut s = state_for_poll.write().unwrap();
                         
@@ -152,6 +160,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         let current_pt = s.now_playing.as_ref().unwrap().current_playback_time;
                         s.position_snapshot_us = (current_pt * 1_000_000.0) as i64;
                         s.position_snapshot_at = std::time::Instant::now();
+                        s.repeat_mode = repeat_mode;
+                        s.shuffle_mode = shuffle_mode;
                         
                         // Build metadata snapshot (while lock held)
                         let metadata_for_signal = build_metadata_map(&s);
@@ -178,6 +188,39 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             metadata_value,
                         ).await;
                         prev_metadata_key = Some(meta_key);
+                    }
+                    
+                    // Emit loop/shuffle change signals
+                    let current_repeat = {
+                        let s = state_for_poll.read().unwrap();
+                        s.repeat_mode
+                    };
+                    let current_shuffle = {
+                        let s = state_for_poll.read().unwrap();
+                        s.shuffle_mode
+                    };
+                    
+                    if prev_repeat_mode != Some(current_repeat) {
+                        let status_str = match current_repeat {
+                            1 => "Track",
+                            2 => "Playlist",
+                            _ => "None",
+                        };
+                        let _ = emit_properties_changed(
+                            &conn_for_signals,
+                            "LoopStatus",
+                            Value::new(status_str),
+                        ).await;
+                        prev_repeat_mode = Some(current_repeat);
+                    }
+                    
+                    if prev_shuffle_mode != Some(current_shuffle) {
+                        let _ = emit_properties_changed(
+                            &conn_for_signals,
+                            "Shuffle",
+                            Value::new(current_shuffle != 0),
+                        ).await;
+                        prev_shuffle_mode = Some(current_shuffle);
                     }
                 }
                 Ok(None) => {
@@ -206,6 +249,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         ).await;
                         prev_status = Some(PlaybackStatus::Stopped);
                         prev_metadata_key = None;
+                        prev_repeat_mode = None;
+                        prev_shuffle_mode = None;
                     }
                 }
                 Err(e) => {
