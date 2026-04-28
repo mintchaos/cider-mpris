@@ -66,12 +66,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         
         loop {
             // --- Check playback status from Cider ---
-            let is_playing = match client_for_poll.is_playing().await {
-                Ok(playing) => playing,
-                Err(e) => {
-                    // Cider became unavailable
+            // Use a short timeout so unavailability is detected quickly
+            let is_playing_result = tokio::time::timeout(
+                tokio::time::Duration::from_secs(2),
+                client_for_poll.is_playing(),
+            ).await;
+            
+            let is_playing = match is_playing_result {
+                Ok(Ok(playing)) => playing,
+                _ => {
+                    // Cider became unavailable or check timed out
                     if cider_available {
-                        tracing::warn!("Cider became unavailable: {:?}", e);
+                        tracing::warn!("Cider became unavailable (timeout or connection error)");
                         cider_available = false;
                         
                         let should_emit = {
