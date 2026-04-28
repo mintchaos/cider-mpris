@@ -103,6 +103,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 Value::new(HashMap::<String, Value<'_>>::new()),
                             ).await;
                         }
+
+                        // Release D-Bus name so widgets hide the player
+                        let _ = conn_for_signals
+                            .release_name("org.mpris.MediaPlayer2.cider")
+                            .await;
                         prev_status = Some(PlaybackStatus::Stopped);
                         prev_metadata_key = None;
                     }
@@ -115,6 +120,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             if !cider_available {
                 tracing::info!("Cider is now available");
                 cider_available = true;
+
+                // Re-request D-Bus name so widgets rediscover the player
+                if let Err(e) = conn_for_signals
+                    .request_name("org.mpris.MediaPlayer2.cider")
+                    .await
+                {
+                    tracing::warn!("Failed to re-request D-Bus name: {:?}", e);
+                }
             }
             
             let new_status = if is_playing {
