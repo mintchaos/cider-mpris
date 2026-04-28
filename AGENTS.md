@@ -1,115 +1,55 @@
-# cider-mpris — MPRIS Bridge for Cider
+# AGENTS.md
 
-## Project Overview
+## Project
 
-This project creates an MPRIS (Media Player Remote Interfacing Standard) bridge that allows system-wide media control of the [Cider](https://cider.sh/) music player on Linux. MPRIS enables integration with desktop environments, media keybindings, and tools like playerctl.
+MPRIS bridge for the [Cider](https://cider.sh/) music player on Linux. Polls Cider's local HTTP API (localhost:10767) and exposes MPRIS D-Bus interfaces (`org.mpris.MediaPlayer2.cider-mpris`) so desktop widgets, media keys, and `playerctl` can control Cider playback.
 
-**Repository**: Jujutsu (jj) version-controlled, not Git.
-
-## Architecture Notes
-
-### MPRIS Compliance
-
-The implementation should conform to [MPRIS v2.2](https://specifications.freedesktop.org/mpris-spec/latest/) specification:
-
-| Interface | Required |
-|-----------|----------|
-| `org.mpris.MediaPlayer2` | Yes — Root object with `Raise`, `CanQuit`, `CanSetFullscreen` |
-| `org.mpris.MediaPlayer2.Player` | Yes — Playback control: `Play`, `Pause`, `Stop`, `Next`, `Previous`, `Seek` |
-| `org.mpris.MediaPlayer2.Playlists` | Optional — Playlist management |
-
-### Cider Communication
-
-The bridge needs to communicate with Cider via its IPC/API. Investigate:
-- WebSocket/HTTP API endpoints
-- Local port or socket
-- IPC mechanism Cider exposes
-
-### Key Implementation Patterns
-
-1. **D-Bus Service Registration**: Register as `org.mpris.MediaPlayer2.cider` on the session bus
-2. **Property Change Notifications**: Emit `PropertiesChanged` signals for metadata, playback status
-3. **Seek Support**: Track position with `Position` property (microseconds)
-4. **Metadata Format**: Use `mpris:trackid`, `mpris:length`, `xesam:artist`, `xesam:title`, etc.
-
-## Conventions
-
-### Project Structure
+## Key Files
 
 ```
 src/
-├── main.rs           # Entry point, D-Bus service registration
-├── player.rs         # Player state management, Cider communication
-├── mpris/
-│   ├── mod.rs        # MPRIS interface implementations
-│   ├── root.rs       # org.mpris.MediaPlayer2
-│   └── player.rs     # org.mpris.MediaPlayer2.Player
-└── cider/
-    ├── mod.rs        # Cider IPC client
-    └── types.rs      # Cider API types
+├── main.rs           # Entry point, D-Bus setup, polling loop with signal emission
+├── cider/
+│   ├── mod.rs        # Async HTTP client for Cider RPC API
+│   └── types.rs      # Serde types for API requests/responses
+└── mpris/
+    ├── mod.rs        # Module declarations
+    ├── root.rs       # org.mpris.MediaPlayer2 interface
+    └── player.rs     # org.mpris.MediaPlayer2.Player interface + state
 ```
 
-## Development Guidelines
+## Cider API
 
-### Testing Strategy
+Base URL: `http://localhost:10767/api/v1/playback/`
+Auth: `apptoken` header from `CIDER_RPC_TOKEN` env var
 
-1. **Unit Tests**: Test individual modules, especially state machine logic
-2. **Integration Tests**: Start a mock Cider server or use recorded responses
-3. **D-Bus Compliance**: Verify with `mpris-explorer` or `dbus-monitor`
-4. **Manual Testing**: `playerctl -p cider status`, `playerctl -p cider play-pause`
+Key endpoints: `is-playing`, `now-playing`, `play`, `pause`, `playpause`, `next`, `previous`, `seek`, `repeat-mode`, `shuffle-mode`, `toggle-repeat`, `toggle-shuffle`
 
-### Common Commands
+Full docs: `docs/cider-rpc-api.md`
+
+## Build & Run
 
 ```bash
-# Build
-cargo build
+# Set token in .env
+echo 'CIDER_RPC_TOKEN=your_token' > .env
 
-# Run
-cargo run
-
-# Test
-cargo test
-
-# Check MPRIS bus (with service running)
-dbus-send --session --dest=org.mpris.MediaPlayer2.cider --type=method_call --print-reply /org/mpris/MediaPlayer2 org.freedesktop.DBus.Properties.Get string:'org.mpris.MediaPlayer2' string:'CanQuit'
-
-# List available players
-playerctl -l
+cargo build --release
+./target/release/cider-mpris
 ```
 
-### Error Handling
+Use `playerctl -p cider-mpris <command>` to test. `RUST_LOG=debug` for verbose output.
 
-- Log connection failures to Cider with clear messages
-- Handle Cider not running gracefully (MPRIS allows this)
-- Validate all D-Bus property accessors
+## Architecture Notes
 
-## MPRIS Properties Reference
+- Polling loop in `main.rs` fetches playback state every 500ms, diffs against previous values, emits `PropertiesChanged` D-Bus signals on change.
+- D-Bus name `org.mpris.MediaPlayer2.cider-mpris` is only requested when Cider is actually playing/paused — released when stopped or unavailable.
+- Position interpolates from API snapshot + wall-clock elapsed time for smooth widget display.
+- All D-Bus method handlers are `async fn` (zbus with `tokio` feature).
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `PlaybackStatus` | `s` | "Playing", "Paused", "Stopped" |
-| `LoopStatus` | `s` | "None", "Track", "Playlist" |
-| `Rate` | `d` | Playback rate (1.0 normal) |
-| `Shuffle` | `b` | Shuffle state |
-| `Volume` | `d` | 0.0 to 1.0 |
-| `Position` | `t` | Microseconds from start |
-| `Metadata` | `a{sv}` | Track info dict |
-| `CanGoNext` | `b` | Next track available |
-| `CanGoPrevious` | `b` | Previous track available |
-| `CanPlay` | `b` | Can start playback |
-| `CanPause` | `b` | Can pause playback |
-| `CanSeek` | `b` | Can seek within track |
-| `CanControl` | `b` | Basic controls available |
+## jj Workflow
 
-## Important Notes
-
-1. **jj Workflow**: Use `jj` instead of `git`. Key commands: `jj log`, `jj new`, `jj describe`, `jj push`
-2. **D-Bus Session**: Ensure running on a session bus (not system bus for desktop players)
-3. **Cider Compatibility**: Verify API version with running Cider instance
-4. **Single Instance**: Handle case where another instance might already own the MPRIS name
-
-## Resources
-
-- [MPRIS Specification](https://specifications.freedesktop.org/mpris-spec/latest/)
-- [zbus Documentation](https://docs.rs/zbus/latest/zbus/)
-- [Cider API Documentation](https://cider.sh/)
+```bash
+jj log         # view history
+jj new -m "..." # new change
+jj describe -m "..." # set description
+```
