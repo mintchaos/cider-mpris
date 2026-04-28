@@ -145,6 +145,11 @@ impl Player {
     async fn set_loop_status(&self, _value: &str) {
         if let Err(e) = self.client.toggle_repeat().await {
             tracing::warn!("Toggle repeat failed: {:?}", e);
+            return;
+        }
+        // Immediately read back new state so widget sees correct value
+        if let Ok(mode) = self.client.get_repeat_mode().await {
+            self.state.write().unwrap().repeat_mode = mode;
         }
     }
 
@@ -162,6 +167,11 @@ impl Player {
     async fn set_shuffle(&self, _value: bool) {
         if let Err(e) = self.client.toggle_shuffle().await {
             tracing::warn!("Toggle shuffle failed: {:?}", e);
+            return;
+        }
+        // Immediately read back new state so widget sees correct value
+        if let Ok(mode) = self.client.get_shuffle_mode().await {
+            self.state.write().unwrap().shuffle_mode = mode;
         }
     }
 

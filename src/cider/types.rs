@@ -17,6 +17,10 @@ pub struct NowPlayingInfo {
     #[serde(rename = "currentPlaybackTime")]
     pub current_playback_time: f64,
     pub artwork: Option<Artwork>,
+    #[serde(rename = "repeatMode", default)]
+    pub repeat_mode: u8,
+    #[serde(rename = "shuffleMode", default)]
+    pub shuffle_mode: u8,
 }
 
 #[derive(Debug, Clone, Deserialize)]

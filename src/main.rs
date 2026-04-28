@@ -33,8 +33,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // D-Bus setup
     let conn = Connection::session().await?;
     
-    // Request the well-known name
-    conn.request_name("org.mpris.MediaPlayer2.cider").await?;
+    // Don't request the well-known name yet — defer until Cider is actually playing.
+    // This prevents an empty player widget from appearing when Cider is closed.
     
     let object_server = conn.object_server();
     
@@ -61,6 +61,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let active_interval = tokio::time::Duration::from_millis(500);
         let retry_interval = tokio::time::Duration::from_secs(2);
         let mut cider_available = true;
+        let mut name_owned = false;
         let mut prev_status: Option<PlaybackStatus> = None;
         let mut prev_metadata_key: Option<String> = None;
         let mut prev_repeat_mode: Option<u8> = None;
@@ -107,9 +108,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
 
                         // Release D-Bus name so widgets hide the player
-                        let _ = conn_for_signals
-                            .release_name("org.mpris.MediaPlayer2.cider")
-                            .await;
+                        if name_owned {
+                            let _ = conn_for_signals
+                                .release_name("org.mpris.MediaPlayer2.cider")
+                                .await;
+                            name_owned = false;
+                        }
                         prev_status = Some(PlaybackStatus::Stopped);
                         prev_metadata_key = None;
                         prev_repeat_mode = None;
@@ -124,14 +128,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             if !cider_available {
                 tracing::info!("Cider is now available");
                 cider_available = true;
-
-                // Re-request D-Bus name so widgets rediscover the player
-                if let Err(e) = conn_for_signals
-                    .request_name("org.mpris.MediaPlayer2.cider")
-                    .await
-                {
-                    tracing::warn!("Failed to re-request D-Bus name: {:?}", e);
-                }
             }
             
             let new_status = if is_playing {
@@ -143,9 +139,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // --- Fetch now-playing metadata ---
             match client_for_poll.now_playing().await {
                 Ok(Some(info)) => {
-                    // Fetch repeat and shuffle modes before acquiring the write lock
-                    let repeat_mode = client_for_poll.get_repeat_mode().await.unwrap_or(0);
-                    let shuffle_mode = client_for_poll.get_shuffle_mode().await.unwrap_or(0);
+                    // Register D-Bus name now that something is playing
+                    if !name_owned {
+                        if let Err(e) = conn_for_signals
+                            .request_name("org.mpris.MediaPlayer2.cider")
+                            .await
+                        {
+                            tracing::warn!("Failed to request D-Bus name: {:?}", e);
+                        } else {
+                            name_owned = true;
+                        }
+                    }
+
+                    // Extract repeat/shuffle from the now-playing response
+                    let repeat_mode = info.repeat_mode;
+                    let shuffle_mode = info.shuffle_mode;
                     
                     let (meta_key, metadata_changed, status_changed, metadata_for_signal) = {
                         let mut s = state_for_poll.write().unwrap();
@@ -224,6 +232,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
                 Ok(None) => {
+                    // Cider reports nothing playing — release D-Bus name so widget hides
+                    if name_owned {
+                        let _ = conn_for_signals
+                            .release_name("org.mpris.MediaPlayer2.cider")
+                            .await;
+                        name_owned = false;
+                    }
+
                     // Cider reports nothing playing — treat as Stopped
                     let should_emit = {
                         let mut s = state_for_poll.write().unwrap();
