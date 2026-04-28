@@ -23,6 +23,11 @@
         };
       }
     ) // {
-      homeModules.cider-mpris = import ./home-module.nix;
+      homeModules.cider-mpris = { config, lib, pkgs, ... }: {
+        imports = [ ./home-module.nix ];
+        config = lib.mkIf config.services.cider-mpris.enable {
+          services.cider-mpris.package = lib.mkDefault self.packages.${pkgs.system}.default;
+        };
+      };
     };
 }

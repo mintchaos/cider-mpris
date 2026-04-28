@@ -5,7 +5,10 @@ in {
   options.services.cider-mpris = {
     enable = lib.mkEnableOption "Cider MPRIS bridge";
 
-    package = lib.mkPackageOption pkgs "cider-mpris" { };
+    package = lib.mkOption {
+      type = lib.types.package;
+      description = "The cider-mpris package to use (set by the flake)";
+    };
 
     rpcTokenFile = lib.mkOption {
       type = lib.types.nullOr lib.types.path;
