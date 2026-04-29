@@ -1,7 +1,0 @@
-{
-  "pathAccess": {
-    "allowedPaths": [
-      "/dev/null"
-    ]
-  }
-}
