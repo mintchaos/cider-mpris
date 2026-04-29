@@ -38,7 +38,7 @@ EOF
         Type = "simple";
         ExecStart = "${cfg.package}/bin/cider-mpris";
         EnvironmentFile = "${config.xdg.configHome}/cider-mpris/env";
-        Restart = "on-failure";
+        Restart = "always";
         RestartSec = 5;
       };
       Install.WantedBy = [ "default.target" ];
