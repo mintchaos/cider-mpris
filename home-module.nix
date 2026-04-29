@@ -14,13 +14,18 @@ in {
   config = lib.mkIf cfg.enable {
     home.packages = [ cfg.package ];
 
-    # The env file is created as a placeholder. You must edit it with your
-    # Cider RPC token, or set CIDER_RPC_TOKEN in your environment another way.
-    # Without the token, the service will fail to start.
-    xdg.configFile."cider-mpris/env".text = ''
-      # Add your CIDER_RPC_TOKEN here.
-      # Find it in Cider: Settings → RPC Token
-      CIDER_RPC_TOKEN=
+    # Only create the env file if it doesn't already exist (so home-manager
+    # doesn't clobber the user's manual edits).
+    home.activation.createCiderMprisEnv = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      ENV_FILE="$HOME/.config/cider-mpris/env"
+      if [ ! -f "$ENV_FILE" ]; then
+        mkdir -p "$(dirname "$ENV_FILE")"
+        cat > "$ENV_FILE" << 'EOF'
+# Add your CIDER_RPC_TOKEN here.
+# Find it in Cider: Settings → RPC Token
+CIDER_RPC_TOKEN=
+EOF
+      fi
     '';
 
     systemd.user.services.cider-mpris = {
