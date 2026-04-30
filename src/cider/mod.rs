@@ -142,6 +142,27 @@ impl CiderClient {
             .await?;
         Ok(())
     }
+
+    pub async fn get_volume(&self) -> Result<f64, ClientError> {
+        let url = format!("{}/api/v1/playback/volume", self.base_url);
+        let resp = self.client
+            .get(&url)
+            .headers(self.headers())
+            .send()
+            .await?;
+        Ok(resp.json::<types::VolumeResponse>().await?.volume)
+    }
+
+    pub async fn set_volume(&self, volume: f64) -> Result<(), ClientError> {
+        let url = format!("{}/api/v1/playback/volume", self.base_url);
+        self.client
+            .post(&url)
+            .headers(self.headers())
+            .json(&types::SetVolumeRequest { volume })
+            .send()
+            .await?;
+        Ok(())
+    }
 }
 
 #[derive(Debug)]
