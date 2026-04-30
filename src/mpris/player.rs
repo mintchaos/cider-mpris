@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use std::sync::{Arc, RwLock};
 use zbus::interface;
 use zbus::zvariant::{ObjectPath, Value};
@@ -30,6 +30,8 @@ pub struct PlayerState {
     pub position_snapshot_at: Instant,
     pub repeat_mode: u8,
     pub shuffle_mode: u8,
+    pub volume: f64,
+    pub volume_fetched_at: Instant,
 }
 
 impl Default for PlayerState {
@@ -41,6 +43,8 @@ impl Default for PlayerState {
             position_snapshot_at: Instant::now(),
             repeat_mode: 0,
             shuffle_mode: 0,
+            volume: 1.0,
+            volume_fetched_at: Instant::now(),
         }
     }
 }
@@ -176,8 +180,43 @@ impl Player {
     }
 
     #[zbus(property)]
-    fn volume(&self) -> f64 {
-        1.0
+    async fn volume(&self) -> f64 {
+        let should_fetch = {
+            let state = self.state.read().unwrap();
+            state.volume_fetched_at.elapsed() > Duration::from_millis(500)
+        };
+
+        if should_fetch {
+            match self.client.get_volume().await {
+                Ok(vol) => {
+                    let mut state = self.state.write().unwrap();
+                    state.volume = vol;
+                    state.volume_fetched_at = Instant::now();
+                    vol
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to get volume: {:?}", e);
+                    self.state.read().unwrap().volume
+                }
+            }
+        } else {
+            self.state.read().unwrap().volume
+        }
+    }
+
+    #[zbus(property)]
+    async fn set_volume(&self, value: f64) {
+        // Optimistic update — reflect the new value immediately
+        {
+            let mut state = self.state.write().unwrap();
+            state.volume = value;
+            state.volume_fetched_at = Instant::now();
+        }
+
+        // Fire-and-forget to Cider
+        if let Err(e) = self.client.set_volume(value).await {
+            tracing::warn!("Failed to set volume: {:?}", e);
+        }
     }
 
     #[zbus(property(emits_changed_signal = "true"))]
