@@ -49,3 +49,13 @@ pub struct ShuffleModeResponse {
 pub struct SeekRequest {
     pub position: f64,
 }
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct VolumeResponse {
+    pub volume: f64,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct SetVolumeRequest {
+    pub volume: f64,
+}
